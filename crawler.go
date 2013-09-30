@@ -5,13 +5,11 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/jaeyeom/gofiletable/table"
 )
@@ -42,11 +40,7 @@ func NewCrawler(tbl *table.Table, fetcher Fetcher, wg *sync.WaitGroup) chan stri
 				// TODO: Handle error
 				continue
 			}
-			now := time.Now()
-			key := fmt.Sprintf("%d %s", now.UnixNano(), url)
-			tbl.Put([]byte(key), body)
-			master, _ := tbl.Get([]byte(url))
-			tbl.Put([]byte(url), []byte(fmt.Sprintf("%d\n%s", now.UnixNano(), master)))
+			tbl.Put([]byte(url), body)
 		}
 	}()
 	return c
@@ -67,7 +61,6 @@ func (f DefaultFetcher) Fetch(url string) (body []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println(string(body))
 	return
 }
 
@@ -83,6 +76,7 @@ func main() {
 	fetcher := DefaultFetcher{}
 	tbl, err := table.Create(table.TableOption{
 		BaseDirectory: *tablePath,
+		KeepSnapshots: true,
 	})
 	if err != nil {
 		log.Println(err)
