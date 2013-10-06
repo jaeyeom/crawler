@@ -5,12 +5,11 @@ package main
 import (
 	"bufio"
 	"flag"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"sync"
 
+	"github.com/jaeyeom/crawler/fetcher"
 	"github.com/jaeyeom/gofiletable/table"
 )
 
@@ -19,22 +18,15 @@ var (
 	urlsPath  = flag.String("urls_path", "", "path to the list of URLs")
 )
 
-type Fetcher interface {
-	Fetch(url string) (body []byte, err error)
-}
-
-type DefaultFetcher struct {
-}
-
 // Create a new crawler and returns a channel that receives URLs.
-func NewCrawler(tbl *table.Table, fetcher Fetcher, wg *sync.WaitGroup) chan string {
+func NewCrawler(tbl *table.Table, fetcherImpl fetcher.Fetcher, wg *sync.WaitGroup) chan string {
 	c := make(chan string)
 	go func() {
 		if wg != nil {
 			defer wg.Done()
 		}
 		for url := range c {
-			body, err := fetcher.Fetch(url)
+			body, err := fetcherImpl.Fetch(url)
 			if err != nil {
 				log.Println("Crawl error:", url)
 				// TODO: Handle error
@@ -46,24 +38,6 @@ func NewCrawler(tbl *table.Table, fetcher Fetcher, wg *sync.WaitGroup) chan stri
 	return c
 }
 
-// Fetch fetches the page from URL.
-func (f DefaultFetcher) Fetch(url string) (body []byte, err error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		// TODO: Handle the case.
-		return []byte{}, nil
-	}
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return
-}
-
 func main() {
 	flag.Parse()
 	f, err := os.Open(*urlsPath)
@@ -73,7 +47,7 @@ func main() {
 	}
 	defer f.Close()
 	urls := bufio.NewScanner(f)
-	fetcher := DefaultFetcher{}
+	defaultFetcher := fetcher.DefaultFetcher{}
 	tbl, err := table.Create(table.TableOption{
 		BaseDirectory: *tablePath,
 		KeepSnapshots: true,
@@ -84,7 +58,7 @@ func main() {
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)
-	crawler := NewCrawler(tbl, fetcher, &wg)
+	crawler := NewCrawler(tbl, defaultFetcher, &wg)
 	for urls.Scan() {
 		crawler <- urls.Text()
 	}
