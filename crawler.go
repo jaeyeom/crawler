@@ -26,13 +26,19 @@ func NewCrawler(tbl *table.Table, fetcherImpl fetcher.Fetcher, wg *sync.WaitGrou
 			defer wg.Done()
 		}
 		for url := range c {
-			body, err := fetcherImpl.Fetch(url)
+			fetchInfo, err := fetcherImpl.Fetch(url)
 			if err != nil {
 				log.Println("Crawl error:", url)
 				// TODO: Handle error
 				continue
 			}
-			tbl.Put([]byte(url), body)
+			if fetchInfo == nil {
+				log.Println("Status is not 200:", url)
+			}
+			if fetchInfo.Key == nil {
+				log.Println("URL parsing failed:", url)
+			}
+			tbl.Put([]byte(fetchInfo.Key.String()), fetchInfo.Contents)
 		}
 	}()
 	return c
