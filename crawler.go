@@ -18,42 +18,51 @@ var (
 	urlsPath  = flag.String("urls_path", "", "path to the list of URLs")
 )
 
-// Create a new crawler and returns a channel that receives URLs.
-func NewCrawler(tbl *table.Table, fetcherImpl fetcher.Fetcher, wg *sync.WaitGroup) chan string {
-	c := make(chan string)
-	go func() {
-		if wg != nil {
-			defer wg.Done()
-		}
-		for url := range c {
-			fetchInfo, err := fetcherImpl.Fetch(url)
-			if err != nil {
-				log.Println("Crawl error:", url)
-				// TODO: Handle error
-				continue
-			}
-			if fetchInfo == nil {
-				log.Println("Status is not 200:", url)
-			}
-			if fetchInfo.Key == nil {
-				log.Println("URL parsing failed:", url)
-			}
-			tbl.Put([]byte(fetchInfo.Key.String()), fetchInfo.Contents)
-		}
-	}()
-	return c
+// LogError reads errors from cerr and write logs.
+func LogError(cerr <-chan error) {
+	for err := range cerr {
+		log.Println(err)
+	}
+}
+
+// FeedFromFile reads a file from path and emits urls.
+func FeedFromFile(path string, urls chan<- string, cerr chan<- error) {
+	defer close(urls)
+	f, err := os.Open(path)
+	if err != nil {
+		cerr <- err
+		return
+	}
+	defer f.Close()
+	urlScanner := bufio.NewScanner(f)
+	for urlScanner.Scan() {
+		urls <- urlScanner.Text()
+	}
+}
+
+// WriteTable writes fetchInfo to the table.
+func WriteTable(tbl *table.Table, fetchInfo <-chan *fetcher.FetchInfo, wg *sync.WaitGroup) {
+	if wg != nil {
+		defer wg.Done()
+	}
+	for info := range fetchInfo {
+		tbl.Put([]byte(info.Key.String()), info.Contents)
+	}
 }
 
 func main() {
 	flag.Parse()
-	f, err := os.Open(*urlsPath)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer f.Close()
-	urls := bufio.NewScanner(f)
+	cerr := make(chan error)
+	defer close(cerr)
+	go LogError(cerr)
+
+	urls := make(chan string)
+	go FeedFromFile(*urlsPath, urls, cerr)
+
 	defaultFetcher := fetcher.DefaultFetcher{}
+	fetchInfo := make(chan *fetcher.FetchInfo)
+	go fetcher.ScheduleLinearFetch(defaultFetcher, urls, fetchInfo)
+
 	tbl, err := table.Create(table.TableOption{
 		BaseDirectory: *tablePath,
 		KeepSnapshots: true,
@@ -64,10 +73,6 @@ func main() {
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)
-	crawler := NewCrawler(tbl, defaultFetcher, &wg)
-	for urls.Scan() {
-		crawler <- urls.Text()
-	}
-	close(crawler)
+	WriteTable(tbl, fetchInfo, &wg)
 	wg.Wait()
 }
