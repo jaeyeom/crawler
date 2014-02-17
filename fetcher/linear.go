@@ -14,12 +14,8 @@ func ScheduleLinearFetch(fetcherImpl Fetcher, urls <-chan string, fetchInfo chan
 			// TODO: Handle error
 			continue
 		}
-		if info == nil {
+		if *info.StatusCode != 200 {
 			log.Println("Status is not 200:", url)
-			continue
-		}
-		if info.Key == nil {
-			log.Println("URL parsing failed:", url)
 			continue
 		}
 		fetchInfo <- info

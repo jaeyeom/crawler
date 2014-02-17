@@ -31,11 +31,7 @@ func (f DefaultFetcher) Fetch(rawurl string) (fetchInfo *FetchInfo, err error) {
 		return
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		info.StatusCode = proto.Int32(int32(resp.StatusCode))
-		fetchInfo = info
-		return
-	}
+	info.StatusCode = proto.Int32(int32(resp.StatusCode))
 	info.Contents, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
