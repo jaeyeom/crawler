@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 type Fetcher interface {
@@ -15,26 +17,23 @@ type Fetcher interface {
 type DefaultFetcher struct {
 }
 
-type FetchInfo struct {
-	Key        *url.URL
-	Contents   []byte
-	StatusCode int
-}
-
 // Fetch fetches the page from URL.
 func (f DefaultFetcher) Fetch(rawurl string) (fetchInfo *FetchInfo, err error) {
 	info := &FetchInfo{}
-	info.Key, err = url.Parse(rawurl)
+	var key *url.URL
+	key, err = url.Parse(rawurl)
 	if err != nil {
 		return
 	}
+	info.Url = proto.String(key.String())
 	resp, err := http.Get(rawurl)
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		// TODO: Handle the case.
+		info.StatusCode = proto.Int32(int32(resp.StatusCode))
+		fetchInfo = info
 		return
 	}
 	info.Contents, err = ioutil.ReadAll(resp.Body)
