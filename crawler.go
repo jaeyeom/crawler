@@ -46,7 +46,7 @@ func WriteTable(tbl *table.Table, fetchInfo <-chan *fetcher.FetchInfo, wg *sync.
 		defer wg.Done()
 	}
 	for info := range fetchInfo {
-		tbl.Put([]byte(info.Key.String()), info.Contents)
+		tbl.Put([]byte(*info.Url), info.Contents)
 	}
 }
 
