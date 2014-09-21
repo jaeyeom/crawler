@@ -10,14 +10,17 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 )
 
+// Fetcher is an interface that implements Fetch function.
 type Fetcher interface {
 	Fetch(rawurl string) (fetchInfo *FetchInfo, err error)
 }
 
+// DefaultFetcher is a straightforward fetcher implementation that
+// uses http.Get().
 type DefaultFetcher struct {
 }
 
-// Fetch fetches the page from URL.
+// Fetch fetches the page from URL and fills fetchInfo.
 func (f DefaultFetcher) Fetch(rawurl string) (fetchInfo *FetchInfo, err error) {
 	info := &FetchInfo{}
 	var key *url.URL
