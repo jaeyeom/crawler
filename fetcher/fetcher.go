@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 // Fetcher is an interface that implements Fetch function.
